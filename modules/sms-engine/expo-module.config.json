@@ -1,0 +1,8 @@
+{
+  "name": "sms-engine",
+  "platforms": ["android"],
+  "android": {
+    "package": "expo.modules.smsengine",
+    "modules": ["expo.modules.smsengine.SmsEngineModule"]
+  }
+}
