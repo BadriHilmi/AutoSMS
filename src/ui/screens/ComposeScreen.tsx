@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   PermissionsAndroid,
+  Linking,
 } from 'react-native';
 import { useTheme } from '../../theme';
 import { Card } from '../components/Card';
@@ -201,18 +202,28 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
 
     if (Platform.OS === 'android') {
       try {
-        const granted = await PermissionsAndroid.request(
+        const permissionsToRequest: any[] = [
           PermissionsAndroid.PERMISSIONS.SEND_SMS,
-          {
-            title: 'AutoSMS Permission',
-            message: 'AutoSMS requires permission to send SMS messages on your behalf.',
-            buttonPositive: 'OK',
-          }
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+        ];
+        if (Number(Platform.Version) >= 33) {
+          permissionsToRequest.push(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+        }
+
+        const results = await PermissionsAndroid.requestMultiple(permissionsToRequest);
+        const smsGranted = results[PermissionsAndroid.PERMISSIONS.SEND_SMS] === PermissionsAndroid.RESULTS.GRANTED;
+
+        if (!smsGranted) {
           Alert.alert(
-            'Permission Required',
-            'SMS permission is required to send campaigns. Please allow SMS permission in device settings.'
+            'SMS Permission Required',
+            'AutoSMS requires SMS permission to send campaigns. Please enable SMS access in device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => Linking.openSettings(),
+              },
+            ]
           );
           return;
         }
