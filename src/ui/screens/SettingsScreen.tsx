@@ -182,7 +182,7 @@ export const SettingsScreen: React.FC = () => {
             <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
               <MaterialIcons name="notifications-none" size={18} color={colors.primary} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={[styles.settingTitle, { color: colors.text }]}>Notifications</Text>
               <Text style={[styles.settingSub, { color: colors.textMuted }]}>Delivery & send alerts</Text>
             </View>
@@ -201,9 +201,11 @@ export const SettingsScreen: React.FC = () => {
             <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
               <MaterialIcons name="schedule-send" size={18} color={colors.primary} />
             </View>
-            <View style={{ flex: 1, paddingRight: 8 }}>
+            <View style={{ flex: 1 }}>
               <Text style={[styles.settingTitle, { color: colors.text }]}>Pre-campaign heads-up</Text>
-              <Text style={[styles.settingSub, { color: colors.textMuted }]}>Alert 5m before large campaigns (10+ contacts)</Text>
+              <Text style={[styles.settingSub, { color: colors.textMuted }]}>
+                Alert 5m before large campaigns (10+ contacts)
+              </Text>
             </View>
           </View>
           <Switch
@@ -220,7 +222,7 @@ export const SettingsScreen: React.FC = () => {
             <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
               <MaterialIcons name="lock-outline" size={18} color={colors.primary} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={[styles.settingTitle, { color: colors.text }]}>App lock</Text>
               <Text style={[styles.settingSub, { color: colors.textMuted }]}>Require biometric / PIN</Text>
             </View>
@@ -239,7 +241,7 @@ export const SettingsScreen: React.FC = () => {
           onPress={handleRequestBatteryOptimization}
           activeOpacity={0.7}
         >
-          <View style={[styles.settingLeft, { flex: 1, paddingRight: 8 }]}>
+          <View style={styles.settingLeft}>
             <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
               <MaterialIcons name="battery-charging-full" size={18} color={colors.primary} />
             </View>
@@ -434,9 +436,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   settingLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    paddingRight: 10,
   },
   iconBox: {
     width: 34,
