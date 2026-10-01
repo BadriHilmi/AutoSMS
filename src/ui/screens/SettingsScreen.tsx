@@ -340,25 +340,6 @@ export const SettingsScreen: React.FC = () => {
 
       {/* Group: Data & Storage */}
       <Card title="Data & Backups" iconName="storage">
-        {/* Excluded numbers */}
-        <TouchableOpacity
-          style={[styles.settingRow, { borderBottomColor: colors.border }]}
-          onPress={() => Alert.alert('Excluded Numbers', 'Manage global blacklisted numbers.')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.settingLeft}>
-            <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
-              <MaterialIcons name="block" size={18} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={[styles.settingTitle, { color: colors.text }]}>Excluded numbers</Text>
-              <Text style={[styles.settingSub, { color: colors.textMuted }]}>
-                Blacklist specific contacts
-              </Text>
-            </View>
-          </View>
-          <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
 
         {/* Export history */}
         <TouchableOpacity
