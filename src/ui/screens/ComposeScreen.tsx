@@ -69,7 +69,7 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
   const [customRule, setCustomRule] = useState<CustomRecurrenceRule | null>(null);
   const [isCustomRecurrenceOpen, setIsCustomRecurrenceOpen] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  const { sendDelay, setSendDelay } = useAppSettings();
+  const { sendDelay, setSendDelay, notificationsEnabled, preAlertEnabled } = useAppSettings();
 
   const smsMetrics = calculateSmsSegments(message);
 
@@ -274,6 +274,7 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
     try {
       await SmsEngine.scheduleAlarmTask({
         taskId: scheduleId,
+        title: campaignTitle || 'SMS Campaign',
         timestamp: runTimestamp,
         message: message,
         recipientsJson: JSON.stringify(recipients),
@@ -281,6 +282,8 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
         simSlot: simSlot,
         frequency: recurrence,
         customRule: customRuleStr || undefined,
+        notificationsEnabled,
+        preAlertEnabled,
       });
       console.log(`Campaign ${scheduleId} alarm scheduled for timestamp: ${runTimestamp} (${new Date(runTimestamp).toLocaleString()})`);
     } catch (schedErr) {
@@ -292,12 +295,15 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
       try {
         await SmsEngine.runCampaignNow({
           taskId: scheduleId,
+          title: campaignTitle || 'SMS Campaign',
           message: message,
           recipientsJson: JSON.stringify(recipients),
           intervalDelaySec: sendDelay,
           simSlot: simSlot,
           frequency: recurrence,
           customRule: customRuleStr || undefined,
+          notificationsEnabled,
+          preAlertEnabled,
         });
       } catch (runErr) {
         console.log('Direct run error:', runErr);

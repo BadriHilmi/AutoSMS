@@ -20,9 +20,11 @@ import { EditTaskModal } from '../components/EditTaskModal';
 import { formatRecurrenceLabel } from '../../domain/scheduler';
 import SmsEngine from '../../../modules/sms-engine';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAppSettings } from '../../context/AppSettingsContext';
 
 export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ onNavigateToCompose }) => {
   const { colors } = useTheme();
+  const { notificationsEnabled, preAlertEnabled } = useAppSettings();
 
   const [activeTab, setActiveTab] = useState<'active' | 'upcoming' | 'completed'>('active');
   const [schedulesList, setSchedulesList] = useState<Schedule[]>([]);
@@ -128,12 +130,15 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
           try {
             await SmsEngine.runCampaignNow({
               taskId: task.id,
+              title: task.title || 'SMS Campaign',
               message: task.messageBody,
               recipientsJson: task.targetNumbers || '[]',
               intervalDelaySec: task.intervalDelaySec ?? 10,
               simSlot: task.simSlot ?? 0,
               frequency: task.frequency,
               customRule: task.customRule ?? undefined,
+              notificationsEnabled,
+              preAlertEnabled,
             });
           } catch (runErr) {
             console.log('Failed to trigger due task:', runErr);
@@ -179,12 +184,15 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
             try {
               await SmsEngine.runCampaignNow({
                 taskId: task.id,
+                title: task.title || 'SMS Campaign',
                 message: task.messageBody,
                 recipientsJson: task.targetNumbers || '[]',
                 intervalDelaySec: task.intervalDelaySec ?? 10,
                 simSlot: task.simSlot ?? 0,
                 frequency: task.frequency,
                 customRule: task.customRule ?? undefined,
+                notificationsEnabled,
+                preAlertEnabled,
               });
               await updateScheduleStatus(task.id, 'RUNNING');
               setSchedulesList((prev) =>
@@ -218,6 +226,7 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
         try {
           await SmsEngine.scheduleAlarmTask({
             taskId: updatedTask.id,
+            title: updatedTask.title || 'SMS Campaign',
             timestamp: updatedTask.startDate,
             message: updatedTask.messageBody,
             recipientsJson: updatedTask.targetNumbers,
@@ -225,6 +234,8 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
             simSlot: updatedTask.simSlot ?? 0,
             frequency: updatedTask.frequency,
             customRule: updatedTask.customRule || undefined,
+            notificationsEnabled,
+            preAlertEnabled,
           });
         } catch (alarmErr) {
           console.log('Alarm reschedule notice:', alarmErr);

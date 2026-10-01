@@ -21,14 +21,18 @@ class BatchSmsForegroundService : Service() {
 
     companion object {
         const val CHANNEL_ID = "AutoSMS_Batch_Channel"
+        const val CHANNEL_ALERTS_ID = "AutoSMS_Alerts_Channel"
         const val NOTIFICATION_ID = 1001
         const val EXTRA_TASK_ID = "extra_task_id"
+        const val EXTRA_TITLE = "extra_title"
         const val EXTRA_MESSAGE = "extra_message"
         const val EXTRA_RECIPIENTS_JSON = "extra_recipients_json"
         const val EXTRA_INTERVAL_DELAY = "extra_interval_delay"
         const val EXTRA_SIM_SLOT = "extra_sim_slot"
         const val EXTRA_FREQUENCY = "extra_frequency"
         const val EXTRA_CUSTOM_RULE = "extra_custom_rule"
+        const val EXTRA_NOTIFICATIONS_ENABLED = "extra_notifications_enabled"
+        const val EXTRA_PRE_ALERT_ENABLED = "extra_pre_alert_enabled"
 
         const val PREFS_NAME = "AutoSMS_Sync_Prefs"
         const val KEY_PENDING_EVENTS = "pending_events"
@@ -48,14 +52,17 @@ class BatchSmsForegroundService : Service() {
         if (intent == null) return START_NOT_STICKY
 
         val taskId = intent.getStringExtra(EXTRA_TASK_ID) ?: "unknown_task"
+        val title = intent.getStringExtra(EXTRA_TITLE) ?: "SMS Campaign"
         val message = intent.getStringExtra(EXTRA_MESSAGE) ?: ""
         val recipientsJson = intent.getStringExtra(EXTRA_RECIPIENTS_JSON) ?: "[]"
         val intervalDelaySec = intent.getIntExtra(EXTRA_INTERVAL_DELAY, 10)
         val simSlot = intent.getIntExtra(EXTRA_SIM_SLOT, 0)
         val frequency = intent.getStringExtra(EXTRA_FREQUENCY) ?: "ONE_TIME"
         val customRule = intent.getStringExtra(EXTRA_CUSTOM_RULE) ?: ""
+        val notificationsEnabled = intent.getBooleanExtra(EXTRA_NOTIFICATIONS_ENABLED, true)
+        val preAlertEnabled = intent.getBooleanExtra(EXTRA_PRE_ALERT_ENABLED, true)
 
-        val notification = buildNotification("Preparing campaign...", 0, 0)
+        val notification = buildNotification(title, "Preparing campaign...", 0, 0)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
@@ -65,7 +72,7 @@ class BatchSmsForegroundService : Service() {
         if (!isRunning) {
             isRunning = true
             Thread {
-                processBatchSending(taskId, message, recipientsJson, intervalDelaySec, simSlot, frequency, customRule)
+                processBatchSending(taskId, title, message, recipientsJson, intervalDelaySec, simSlot, frequency, customRule, notificationsEnabled, preAlertEnabled)
             }.start()
         }
 
@@ -90,13 +97,19 @@ class BatchSmsForegroundService : Service() {
 
     private fun processBatchSending(
         taskId: String?,
+        title: String,
         message: String,
         recipientsJson: String,
         intervalDelaySec: Int,
         simSlot: Int,
         frequency: String,
-        customRule: String
+        customRule: String,
+        notificationsEnabled: Boolean,
+        preAlertEnabled: Boolean
     ) {
+        var successCount = 0
+        var failedCount = 0
+
         try {
             if (!taskId.isNullOrEmpty()) {
                 val startEvt = JSONObject().apply {
@@ -118,7 +131,7 @@ class BatchSmsForegroundService : Service() {
                 val name = item.optString("name", "")
 
                 if (phone.isNotEmpty()) {
-                    updateNotification("Sending to $phone (${i + 1}/$total)", i + 1, total)
+                    updateNotification(title, "Sending to $phone (${i + 1}/$total)", i + 1, total)
 
                     // Personalize message
                     val personalized = message.replace("{FirstName}", name.split(" ").firstOrNull() ?: "")
@@ -126,7 +139,13 @@ class BatchSmsForegroundService : Service() {
                         .replace("{Date}", java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date()))
                         .replace("{Time}", java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date()))
 
-                    sendSms(smsManager, phone, personalized)
+                    try {
+                        sendSms(smsManager, phone, personalized)
+                        successCount++
+                    } catch (smsErr: Exception) {
+                        Log.e("AutoSMS", "Failed to send SMS to $phone", smsErr)
+                        failedCount++
+                    }
 
                     if (!taskId.isNullOrEmpty()) {
                         val progressEvt = JSONObject().apply {
@@ -212,12 +231,15 @@ class BatchSmsForegroundService : Service() {
                     val alarmMgr = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
                     val intent = Intent(this, AlarmReceiver::class.java).apply {
                         putExtra(EXTRA_TASK_ID, taskId)
+                        putExtra(EXTRA_TITLE, title)
                         putExtra(EXTRA_MESSAGE, message)
                         putExtra(EXTRA_RECIPIENTS_JSON, recipientsJson)
                         putExtra(EXTRA_INTERVAL_DELAY, intervalDelaySec)
                         putExtra(EXTRA_SIM_SLOT, simSlot)
                         putExtra(EXTRA_FREQUENCY, frequency)
                         putExtra(EXTRA_CUSTOM_RULE, updatedRuleStr)
+                        putExtra(EXTRA_NOTIFICATIONS_ENABLED, notificationsEnabled)
+                        putExtra(EXTRA_PRE_ALERT_ENABLED, preAlertEnabled)
                     }
                     val pi = PendingIntent.getBroadcast(this, taskId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -225,6 +247,28 @@ class BatchSmsForegroundService : Service() {
                     } else {
                         alarmMgr?.setExact(AlarmManager.RTC_WAKEUP, nextRun, pi)
                     }
+
+                    // Reschedule pre-alert for nextRun if enabled and >= 10 recipients
+                    val preAlertTime = nextRun - (5 * 60 * 1000L)
+                    if (preAlertEnabled && total >= 10 && preAlertTime > System.currentTimeMillis() + 10000L) {
+                        val preIntent = Intent(this, AlarmReceiver::class.java).apply {
+                            action = AlarmReceiver.ACTION_PRE_ALERT
+                            putExtra(AlarmReceiver.EXTRA_PRE_ALERT_TITLE, title)
+                            putExtra(AlarmReceiver.EXTRA_PRE_ALERT_COUNT, total)
+                        }
+                        val prePI = PendingIntent.getBroadcast(
+                            this,
+                            (taskId + "_pre").hashCode(),
+                            preIntent,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmMgr?.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, preAlertTime, prePI)
+                        } else {
+                            alarmMgr?.setExact(AlarmManager.RTC_WAKEUP, preAlertTime, prePI)
+                        }
+                    }
+
                     Log.d("AutoSMS", "Recurring task $taskId rescheduled to $nextRun")
                 } else {
                     val completedEvt = JSONObject().apply {
@@ -239,8 +283,12 @@ class BatchSmsForegroundService : Service() {
                 }
             }
 
-            updateNotification("Campaign completed ($total sent)", total, total)
-            Thread.sleep(2000)
+            updateNotification(title, "Campaign finished ($total messages sent)", total, total)
+            Thread.sleep(1000)
+
+            if (notificationsEnabled) {
+                postCompletionNotification(title, total, successCount, failedCount)
+            }
         } catch (e: Exception) {
             Log.e("AutoSMS", "Batch sending error", e)
         } finally {
@@ -311,21 +359,31 @@ class BatchSmsForegroundService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val manager = getSystemService(NotificationManager::class.java)
+
+            val batchChannel = NotificationChannel(
                 CHANNEL_ID,
-                "AutoSMS Background Senders",
+                "AutoSMS Active Progress",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows progress of active SMS campaign sending"
+                description = "Shows real-time progress while SMS campaigns are sending"
             }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(batchChannel)
+
+            val alertsChannel = NotificationChannel(
+                CHANNEL_ALERTS_ID,
+                "AutoSMS Campaign Alerts",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Notifications for campaign completion, reminders, and delivery alerts"
+            }
+            manager.createNotificationChannel(alertsChannel)
         }
     }
 
-    private fun buildNotification(text: String, current: Int, max: Int): Notification {
+    private fun buildNotification(title: String, text: String, current: Int, max: Int): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("AutoSMS Campaign Running")
+            .setContentTitle(if (title.isNotEmpty()) title else "AutoSMS Campaign Running")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setProgress(max, current, false)
@@ -333,8 +391,57 @@ class BatchSmsForegroundService : Service() {
             .build()
     }
 
-    private fun updateNotification(text: String, current: Int, max: Int) {
+    private fun updateNotification(title: String, text: String, current: Int, max: Int) {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(NOTIFICATION_ID, buildNotification(text, current, max))
+        manager.notify(NOTIFICATION_ID, buildNotification(title, text, current, max))
+    }
+
+    private fun postCompletionNotification(title: String, total: Int, success: Int, failed: Int) {
+        try {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    CHANNEL_ALERTS_ID,
+                    "AutoSMS Campaign Alerts",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Notifications for campaign completion, reminders, and delivery alerts"
+                }
+                manager.createNotificationChannel(channel)
+            }
+
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = if (launchIntent != null) {
+                PendingIntent.getActivity(
+                    this,
+                    (System.currentTimeMillis() % 100000).toInt(),
+                    launchIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else null
+
+            val contentText = if (failed > 0) {
+                "$success of $total sent, $failed failed"
+            } else {
+                "All $total messages sent successfully"
+            }
+
+            val notification = NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
+                .setContentTitle(if (title.isNotEmpty()) "$title Completed" else "SMS Campaign Completed")
+                .setContentText(contentText)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .build()
+
+            val notifId = (System.currentTimeMillis() % 100000).toInt() + 2000
+            manager.notify(notifId, notification)
+        } catch (e: Exception) {
+            Log.e("AutoSMS", "Failed to post completion notification", e)
+        }
     }
 }

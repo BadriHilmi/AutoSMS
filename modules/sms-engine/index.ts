@@ -16,6 +16,7 @@ export interface DirectSmsOptions {
 
 export interface ScheduleTaskOptions {
   taskId: string;
+  title?: string;
   timestamp: number;
   message: string;
   recipientsJson: string;
@@ -23,6 +24,8 @@ export interface ScheduleTaskOptions {
   simSlot: number;
   frequency?: string;
   customRule?: string;
+  notificationsEnabled?: boolean;
+  preAlertEnabled?: boolean;
 }
 
 export interface SmsEngineInterface {

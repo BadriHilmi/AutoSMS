@@ -29,6 +29,8 @@ export const SettingsScreen: React.FC = () => {
   const {
     notificationsEnabled,
     setNotificationsEnabled,
+    preAlertEnabled,
+    setPreAlertEnabled,
     appLockEnabled,
     setAppLockEnabled,
     defaultSim,
@@ -188,6 +190,25 @@ export const SettingsScreen: React.FC = () => {
           <Switch
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#ffffff"
+          />
+        </View>
+
+        {/* Pre-campaign Heads-up */}
+        <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
+          <View style={styles.settingLeft}>
+            <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
+              <MaterialIcons name="schedule-send" size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={[styles.settingTitle, { color: colors.text }]}>Pre-campaign heads-up</Text>
+              <Text style={[styles.settingSub, { color: colors.textMuted }]}>Alert 5m before large campaigns (10+ contacts)</Text>
+            </View>
+          </View>
+          <Switch
+            value={preAlertEnabled}
+            onValueChange={setPreAlertEnabled}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#ffffff"
           />

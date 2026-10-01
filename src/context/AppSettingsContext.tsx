@@ -8,6 +8,8 @@ export interface AppSettingsContextType {
   setDefaultSim: (sim: 'ASK' | 'SIM1' | 'SIM2') => void;
   notificationsEnabled: boolean;
   setNotificationsEnabled: (enabled: boolean) => void;
+  preAlertEnabled: boolean;
+  setPreAlertEnabled: (enabled: boolean) => void;
   appLockEnabled: boolean;
   setAppLockEnabled: (enabled: boolean) => void;
   isLoading: boolean;
@@ -20,6 +22,8 @@ const AppSettingsContext = createContext<AppSettingsContextType>({
   setDefaultSim: () => {},
   notificationsEnabled: true,
   setNotificationsEnabled: () => {},
+  preAlertEnabled: true,
+  setPreAlertEnabled: () => {},
   appLockEnabled: false,
   setAppLockEnabled: () => {},
   isLoading: true,
@@ -29,6 +33,7 @@ export const AppSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [sendDelay, setSendDelayState] = useState<number>(10);
   const [defaultSim, setDefaultSimState] = useState<'ASK' | 'SIM1' | 'SIM2'>('SIM1');
   const [notificationsEnabled, setNotificationsEnabledState] = useState<boolean>(true);
+  const [preAlertEnabled, setPreAlertEnabledState] = useState<boolean>(true);
   const [appLockEnabled, setAppLockEnabledState] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -48,6 +53,9 @@ export const AppSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
         const savedNotif = await getSetting('notifications_enabled', 'true');
         setNotificationsEnabledState(savedNotif === 'true');
+
+        const savedPreAlert = await getSetting('pre_alert_enabled', 'true');
+        setPreAlertEnabledState(savedPreAlert === 'true');
 
         const savedLock = await getSetting('app_lock_enabled', 'false');
         setAppLockEnabledState(savedLock === 'true');
@@ -81,6 +89,13 @@ export const AppSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     );
   };
 
+  const setPreAlertEnabled = (enabled: boolean) => {
+    setPreAlertEnabledState(enabled);
+    setSetting('pre_alert_enabled', enabled ? 'true' : 'false').catch((err) =>
+      console.warn('Failed to save pre_alert_enabled', err)
+    );
+  };
+
   const setAppLockEnabled = (enabled: boolean) => {
     setAppLockEnabledState(enabled);
     setSetting('app_lock_enabled', enabled ? 'true' : 'false').catch((err) =>
@@ -97,6 +112,8 @@ export const AppSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setDefaultSim,
         notificationsEnabled,
         setNotificationsEnabled,
+        preAlertEnabled,
+        setPreAlertEnabled,
         appLockEnabled,
         setAppLockEnabled,
         isLoading,

@@ -117,6 +117,7 @@ class SmsEngineModule : Module() {
         AsyncFunction("scheduleAlarmTask") { options: Map<String, Any> ->
             val context = appContext.reactContext ?: throw Exception("React context unavailable")
             val taskId = options["taskId"] as? String ?: "task_${System.currentTimeMillis()}"
+            val title = options["title"] as? String ?: "SMS Campaign"
             val timestamp = (options["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis()
             val message = options["message"] as? String ?: ""
             val recipientsJson = options["recipientsJson"] as? String ?: "[]"
@@ -124,17 +125,28 @@ class SmsEngineModule : Module() {
             val simSlot = (options["simSlot"] as? Number)?.toInt() ?: 0
             val frequency = options["frequency"] as? String ?: "ONE_TIME"
             val customRule = options["customRule"] as? String ?: ""
+            val notificationsEnabled = options["notificationsEnabled"] as? Boolean ?: true
+            val preAlertEnabled = options["preAlertEnabled"] as? Boolean ?: true
+
+            val recipientCount = try {
+                org.json.JSONArray(recipientsJson).length()
+            } catch (e: Exception) {
+                0
+            }
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
             val intent = Intent(context, AlarmReceiver::class.java).apply {
                 putExtra(BatchSmsForegroundService.EXTRA_TASK_ID, taskId)
+                putExtra(BatchSmsForegroundService.EXTRA_TITLE, title)
                 putExtra(BatchSmsForegroundService.EXTRA_MESSAGE, message)
                 putExtra(BatchSmsForegroundService.EXTRA_RECIPIENTS_JSON, recipientsJson)
                 putExtra(BatchSmsForegroundService.EXTRA_INTERVAL_DELAY, intervalDelaySec)
                 putExtra(BatchSmsForegroundService.EXTRA_SIM_SLOT, simSlot)
                 putExtra(BatchSmsForegroundService.EXTRA_FREQUENCY, frequency)
                 putExtra(BatchSmsForegroundService.EXTRA_CUSTOM_RULE, customRule)
+                putExtra(BatchSmsForegroundService.EXTRA_NOTIFICATIONS_ENABLED, notificationsEnabled)
+                putExtra(BatchSmsForegroundService.EXTRA_PRE_ALERT_ENABLED, preAlertEnabled)
             }
 
             val pendingIntent = PendingIntent.getBroadcast(
@@ -161,27 +173,65 @@ class SmsEngineModule : Module() {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent)
             }
 
+            // Schedule pre-alert 5 minutes before run for campaigns with >= 10 recipients
+            val preAlertTime = timestamp - (5 * 60 * 1000L)
+            if (preAlertEnabled && recipientCount >= 10 && preAlertTime > System.currentTimeMillis() + 10000L) {
+                val preIntent = Intent(context, AlarmReceiver::class.java).apply {
+                    action = AlarmReceiver.ACTION_PRE_ALERT
+                    putExtra(AlarmReceiver.EXTRA_PRE_ALERT_TITLE, title)
+                    putExtra(AlarmReceiver.EXTRA_PRE_ALERT_COUNT, recipientCount)
+                }
+                val prePI = PendingIntent.getBroadcast(
+                    context,
+                    (taskId + "_pre").hashCode(),
+                    preIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (alarmManager.canScheduleExactAlarms()) {
+                            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, preAlertTime, prePI)
+                        } else {
+                            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, preAlertTime, prePI)
+                        }
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, preAlertTime, prePI)
+                    } else {
+                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, preAlertTime, prePI)
+                    }
+                    android.util.Log.d("AutoSMS", "Pre-alert scheduled for $taskId at $preAlertTime")
+                } catch (e: Exception) {
+                    android.util.Log.w("AutoSMS", "Failed to schedule pre-alert", e)
+                }
+            }
+
             true
         }
 
         AsyncFunction("runCampaignNow") { options: Map<String, Any> ->
             val context = appContext.reactContext ?: throw Exception("React context unavailable")
             val taskId = options["taskId"] as? String ?: "task_${System.currentTimeMillis()}"
+            val title = options["title"] as? String ?: "SMS Campaign"
             val message = options["message"] as? String ?: ""
             val recipientsJson = options["recipientsJson"] as? String ?: "[]"
             val intervalDelaySec = (options["intervalDelaySec"] as? Number)?.toInt() ?: 10
             val simSlot = (options["simSlot"] as? Number)?.toInt() ?: 0
             val frequency = options["frequency"] as? String ?: "ONE_TIME"
             val customRule = options["customRule"] as? String ?: ""
+            val notificationsEnabled = options["notificationsEnabled"] as? Boolean ?: true
+            val preAlertEnabled = options["preAlertEnabled"] as? Boolean ?: true
 
             val serviceIntent = Intent(context, BatchSmsForegroundService::class.java).apply {
                 putExtra(BatchSmsForegroundService.EXTRA_TASK_ID, taskId)
+                putExtra(BatchSmsForegroundService.EXTRA_TITLE, title)
                 putExtra(BatchSmsForegroundService.EXTRA_MESSAGE, message)
                 putExtra(BatchSmsForegroundService.EXTRA_RECIPIENTS_JSON, recipientsJson)
                 putExtra(BatchSmsForegroundService.EXTRA_INTERVAL_DELAY, intervalDelaySec)
                 putExtra(BatchSmsForegroundService.EXTRA_SIM_SLOT, simSlot)
                 putExtra(BatchSmsForegroundService.EXTRA_FREQUENCY, frequency)
                 putExtra(BatchSmsForegroundService.EXTRA_CUSTOM_RULE, customRule)
+                putExtra(BatchSmsForegroundService.EXTRA_NOTIFICATIONS_ENABLED, notificationsEnabled)
+                putExtra(BatchSmsForegroundService.EXTRA_PRE_ALERT_ENABLED, preAlertEnabled)
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -208,6 +258,8 @@ class SmsEngineModule : Module() {
         AsyncFunction("cancelAlarmTask") { taskId: String ->
             val context = appContext.reactContext ?: return@AsyncFunction false
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            
+            // Cancel main campaign alarm
             val intent = Intent(context, AlarmReceiver::class.java)
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -219,6 +271,22 @@ class SmsEngineModule : Module() {
                 alarmManager.cancel(pendingIntent)
                 pendingIntent.cancel()
             }
+
+            // Cancel pre-alert alarm
+            val preIntent = Intent(context, AlarmReceiver::class.java).apply {
+                action = AlarmReceiver.ACTION_PRE_ALERT
+            }
+            val prePI = PendingIntent.getBroadcast(
+                context,
+                (taskId + "_pre").hashCode(),
+                preIntent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (prePI != null) {
+                alarmManager.cancel(prePI)
+                prePI.cancel()
+            }
+
             true
         }
 
