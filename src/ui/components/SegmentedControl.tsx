@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme';
+import { haptics } from '../../utils/haptics';
 
 interface SegmentOption {
   label: string;
@@ -39,7 +40,10 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
               styles.segmentButton,
               isActive && [styles.activeButton, { backgroundColor: colors.primary }],
             ]}
-            onPress={() => onSelect(option.value)}
+            onPress={() => {
+              haptics.selection();
+              onSelect(option.value);
+            }}
             activeOpacity={0.8}
           >
             <Text

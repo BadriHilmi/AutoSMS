@@ -30,6 +30,7 @@ export const Card: React.FC<CardProps> = ({
           backgroundColor: colors.surfaceCard,
           borderColor: colors.border,
           borderRadius: colors.cardRadius,
+          shadowColor: colors.primaryDark,
         },
         style,
       ]}
@@ -39,7 +40,7 @@ export const Card: React.FC<CardProps> = ({
           <View style={styles.titleContainer}>
             {iconName ? (
               <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
-                <MaterialIcons name={iconName} size={15} color={colors.primaryDark} />
+                <MaterialIcons name={iconName} size={16} color={colors.primaryDark} />
               </View>
             ) : dotIcon ? (
               <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
@@ -60,18 +61,17 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     padding: 16,
-    marginBottom: 12,
-    shadowColor: '#002521',
+    marginBottom: 16,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   titleContainer: {
     flexDirection: 'row',
@@ -79,18 +79,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconBox: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dotText: {
-    fontSize: 13,
+    fontSize: 12,
   },
   titleText: {
-    fontSize: 15,
-    fontFamily: 'Sora_700Bold',
+    fontSize: 16,
+    fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
 });

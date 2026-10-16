@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,18 @@ import {
   Platform,
 } from 'react-native';
 import { useTheme } from '../../theme';
-import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
 import { getAllLogs, updateLogStatus } from '../../db/queries/logs';
 import { MessageLog } from '../../db/schema';
 import { MessageDetailModal } from '../components/MessageDetailModal';
 import { MaterialIcons } from '@expo/vector-icons';
+import { haptics } from '../../utils/haptics';
 
-export const HistoryScreen: React.FC = () => {
+interface HistoryScreenProps {
+  onNavigateToCompose?: () => void;
+}
+
+export const HistoryScreen: React.FC<HistoryScreenProps> = ({ onNavigateToCompose }) => {
   const { colors } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +45,7 @@ export const HistoryScreen: React.FC = () => {
   }, [searchQuery, statusFilter]);
 
   const handleRetry = async (log: MessageLog) => {
+    haptics.impactMedium();
     try {
       await updateLogStatus(log.id, 'SENT', Date.now());
       setLogsList((prev) =>
@@ -59,6 +64,45 @@ export const HistoryScreen: React.FC = () => {
 
   const totalSent = logsList.filter((l) => l.status === 'SENT' || l.status === 'DELIVERED').length;
   const totalFailed = logsList.filter((l) => l.status === 'FAILED').length;
+
+  // Group logs chronologically by Date
+  const groupedLogs = useMemo(() => {
+    const groups: { [dateLabel: string]: MessageLog[] } = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    logsList.forEach((log) => {
+      const d = new Date(log.sentAt);
+      const dZero = new Date(d);
+      dZero.setHours(0, 0, 0, 0);
+
+      let label = '';
+      if (dZero.getTime() === today.getTime()) {
+        label = 'Today';
+      } else if (dZero.getTime() === yesterday.getTime()) {
+        label = 'Yesterday';
+      } else {
+        label = d.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+        });
+      }
+
+      if (!groups[label]) {
+        groups[label] = [];
+      }
+      groups[label].push(log);
+    });
+
+    return Object.entries(groups).map(([dateLabel, items]) => ({
+      dateLabel,
+      items,
+    }));
+  }, [logsList]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -105,7 +149,10 @@ export const HistoryScreen: React.FC = () => {
                   borderColor: isActive ? colors.primaryLight : colors.border,
                 },
               ]}
-              onPress={() => setStatusFilter(f.key as any)}
+              onPress={() => {
+                haptics.selection();
+                setStatusFilter(f.key as any);
+              }}
               activeOpacity={0.7}
             >
               <Text
@@ -115,95 +162,133 @@ export const HistoryScreen: React.FC = () => {
                   isActive && styles.activeFilterText,
                 ]}
               >
-                {f.label}
+                {f.label} ({f.count})
               </Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {/* History Cards List */}
+      {/* History Date Grouped List */}
       {logsList.length === 0 ? (
         <View style={[styles.emptyContainer, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
           <View style={[styles.emptyIconCircle, { backgroundColor: colors.primaryContainer }]}>
-            <MaterialIcons name="history" size={36} color={colors.primary} />
+            <MaterialIcons name="history" size={32} color={colors.primary} />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No delivery records found</Text>
           <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-            Messages sent via automated campaigns or direct SMS will appear here with live delivery receipts.
+            {searchQuery
+              ? 'No messages matched your filter or search query.'
+              : 'Messages sent via automated campaigns or direct SMS will appear here with live delivery receipts.'}
           </Text>
+          {onNavigateToCompose && (
+            <TouchableOpacity
+              style={[styles.emptyCtaBtn, { backgroundColor: colors.primary }]}
+              onPress={onNavigateToCompose}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="edit" size={15} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text style={styles.emptyCtaBtnText}>Compose New Message</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
-        logsList.map((log) => {
-          const isFailed = log.status === 'FAILED';
-          return (
-            <TouchableOpacity
-              key={log.id}
-              activeOpacity={0.85}
-              onPress={() => handleShowDetails(log)}
-            >
-              <Card style={styles.historyCard}>
-                <View style={styles.cardTop}>
-                  <View style={styles.cardTopLeft}>
-                    <View style={[styles.avatar, { backgroundColor: isFailed ? colors.errorBg : colors.primaryContainer }]}>
-                      <Text style={[styles.avatarText, { color: isFailed ? colors.error : colors.primaryDark }]}>
-                        {(log.contactName || log.phoneNumber)[0].toUpperCase()}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text style={[styles.contactName, { color: colors.text }]}>
-                        {log.contactName || 'Recipient'}
-                      </Text>
-                      <Text style={[styles.numberText, { color: colors.textMuted }]}>
-                        {log.phoneNumber}
-                      </Text>
-                    </View>
-                  </View>
-                  <StatusBadge status={log.status} />
-                </View>
+        groupedLogs.map(({ dateLabel, items }) => (
+          <View key={dateLabel} style={styles.dateGroupSection}>
+            <View style={styles.dateHeaderRow}>
+              <Text style={[styles.dateHeaderText, { color: colors.textMuted }]}>
+                {dateLabel.toUpperCase()}
+              </Text>
+              <Text style={[styles.dateHeaderCount, { color: colors.textSubtle }]}>
+                {items.length} {items.length === 1 ? 'message' : 'messages'}
+              </Text>
+            </View>
 
-                <View style={[styles.msgContainer, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
-                  <Text style={[styles.msgPreview, { color: colors.text }]} numberOfLines={2}>
-                    {log.messageContent}
-                  </Text>
-                </View>
+            <View style={[styles.groupCard, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
+              {items.map((log, index) => {
+                const isFailed = log.status === 'FAILED';
+                const isLast = index === items.length - 1;
 
-                <View style={styles.cardBottom}>
-                  <View style={styles.metaRow}>
-                    <View style={styles.timeWrapper}>
-                      <MaterialIcons name="schedule" size={13} color={colors.textMuted} />
-                      <Text style={[styles.timeText, { color: colors.textMuted }]}>
-                        {new Date(log.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                    </View>
-                    <View style={[styles.simTag, { backgroundColor: colors.surfaceSunken }]}>
-                      <Text style={[styles.simTagText, { color: colors.textMuted }]}>
-                        SIM {log.simSlot + 1}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {isFailed ? (
+                return (
+                  <View key={log.id}>
                     <TouchableOpacity
-                      style={[styles.actionBadge, { backgroundColor: colors.errorBg }]}
-                      onPress={() => handleRetry(log)}
+                      style={styles.logRow}
                       activeOpacity={0.7}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      onPress={() => handleShowDetails(log)}
                     >
-                      <MaterialIcons name="refresh" size={14} color={colors.error} />
-                      <Text style={[styles.actionText, { color: colors.error }]}>Retry</Text>
+                      {/* Avatar with status tint */}
+                      <View
+                        style={[
+                          styles.avatar,
+                          { backgroundColor: isFailed ? colors.errorBg : colors.primaryContainer },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.avatarText,
+                            { color: isFailed ? colors.error : colors.primaryDark },
+                          ]}
+                        >
+                          {(log.contactName || log.phoneNumber)[0].toUpperCase()}
+                        </Text>
+                      </View>
+
+                      {/* Content column */}
+                      <View style={styles.logInfo}>
+                        <View style={styles.logTitleRow}>
+                          <Text style={[styles.contactName, { color: colors.text }]} numberOfLines={1}>
+                            {log.contactName || log.phoneNumber}
+                          </Text>
+                          <Text style={[styles.timeText, { color: colors.textSubtle }]}>
+                            {new Date(log.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                        </View>
+
+                        <Text style={[styles.msgPreview, { color: colors.textMuted }]} numberOfLines={1}>
+                          {log.messageContent}
+                        </Text>
+
+                        <View style={styles.metaRow}>
+                          <View style={[styles.simTag, { backgroundColor: colors.surfaceSunken }]}>
+                            <Text style={[styles.simTagText, { color: colors.textSubtle }]}>
+                              SIM {log.simSlot + 1}
+                            </Text>
+                          </View>
+                          {log.contactName ? (
+                            <Text style={[styles.phoneSubText, { color: colors.textSubtle }]}>
+                              {log.phoneNumber}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+
+                      {/* Status / Action column */}
+                      <View style={styles.logRight}>
+                        {isFailed ? (
+                          <TouchableOpacity
+                            style={[styles.retryBtn, { backgroundColor: colors.errorBg }]}
+                            onPress={() => handleRetry(log)}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <MaterialIcons name="refresh" size={13} color={colors.error} />
+                            <Text style={[styles.retryText, { color: colors.error }]}>Retry</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <StatusBadge status={log.status} />
+                        )}
+                      </View>
                     </TouchableOpacity>
-                  ) : (
-                    <View style={styles.detailsBtn}>
-                      <Text style={[styles.detailsText, { color: colors.primary }]}>Details</Text>
-                      <MaterialIcons name="chevron-right" size={16} color={colors.primary} />
-                    </View>
-                  )}
-                </View>
-              </Card>
-            </TouchableOpacity>
-          );
-        })
+
+                    {!isLast && (
+                      <View style={[styles.rowDivider, { backgroundColor: colors.borderSubtle }]} />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ))
       )}
 
       <MessageDetailModal
@@ -227,30 +312,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   pageTitleBlock: {
-    paddingVertical: 10,
-    marginBottom: 2,
+    paddingVertical: 12,
+    marginBottom: 4,
   },
   title: {
     fontSize: 20,
+    lineHeight: 26,
     fontFamily: 'Sora_700Bold',
     includeFontPadding: false,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 12.5,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Sora_400Regular',
     includeFontPadding: false,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'android' ? 4 : 8,
+    paddingVertical: Platform.OS === 'android' ? 6 : 10,
     gap: 8,
     marginBottom: 12,
-    shadowColor: '#002521',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -258,7 +344,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Sora_400Regular',
     paddingVertical: 0,
     includeFontPadding: false,
@@ -269,44 +355,63 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   filterPill: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
   },
   filterPillText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
   activeFilterText: {
     fontFamily: 'Sora_700Bold',
   },
-  historyCard: {
-    marginBottom: 10,
-    padding: 13,
+  dateGroupSection: {
+    marginBottom: 16,
   },
-  cardTop: {
+  dateHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    paddingHorizontal: 4,
   },
-  cardTopLeft: {
+  dateHeaderText: {
+    fontSize: 13,
+    fontFamily: 'Sora_600SemiBold',
+    includeFontPadding: false,
+  },
+  dateHeaderCount: {
+    fontSize: 12,
+    fontFamily: 'Sora_500Medium',
+    includeFontPadding: false,
+  },
+  groupCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  logRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    marginRight: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 12,
   },
   avatar: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -316,103 +421,97 @@ const styles = StyleSheet.create({
     fontFamily: 'Sora_700Bold',
     includeFontPadding: false,
   },
-  contactName: {
-    fontSize: 13.5,
-    fontFamily: 'Sora_600SemiBold',
-    includeFontPadding: false,
+  logInfo: {
+    flex: 1,
   },
-  numberText: {
-    fontSize: 11.5,
-    fontFamily: 'Sora_400Regular',
-    marginTop: 1,
-    includeFontPadding: false,
-  },
-  msgContainer: {
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 9,
-    marginBottom: 8,
-  },
-  msgPreview: {
-    fontSize: 12.5,
-    fontFamily: 'Sora_400Regular',
-    lineHeight: 18,
-    includeFontPadding: false,
-  },
-  cardBottom: {
+  logTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 2,
+  },
+  contactName: {
+    fontSize: 14,
+    fontFamily: 'Sora_600SemiBold',
+    includeFontPadding: false,
+    flex: 1,
+    marginRight: 8,
+  },
+  timeText: {
+    fontSize: 12,
+    fontFamily: 'Sora_400Regular',
+    fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
+  },
+  msgPreview: {
+    fontSize: 12,
+    fontFamily: 'Sora_400Regular',
+    lineHeight: 16,
+    marginBottom: 4,
+    includeFontPadding: false,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  timeWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timeText: {
-    fontSize: 11.5,
-    fontFamily: 'Sora_400Regular',
-    includeFontPadding: false,
-  },
   simTag: {
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   simTagText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
-  actionBadge: {
+  phoneSubText: {
+    fontSize: 11,
+    fontFamily: 'Sora_400Regular',
+    fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
+  },
+  logRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  retryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  actionText: {
-    fontSize: 11.5,
+  retryText: {
+    fontSize: 11,
     fontFamily: 'Sora_700Bold',
     includeFontPadding: false,
   },
-  detailsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingVertical: 2,
-  },
-  detailsText: {
-    fontSize: 12,
-    fontFamily: 'Sora_600SemiBold',
-    includeFontPadding: false,
+  rowDivider: {
+    height: 1,
+    marginLeft: 62, // align with content next to avatar
   },
   emptyContainer: {
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 16,
     paddingVertical: 32,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     alignItems: 'center',
     marginTop: 8,
   },
   emptyIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   emptyTitle: {
-    fontSize: 14.5,
-    fontFamily: 'Sora_700Bold',
-    marginBottom: 5,
+    fontSize: 16,
+    fontFamily: 'Sora_600SemiBold',
+    marginBottom: 4,
     textAlign: 'center',
     includeFontPadding: false,
   },
@@ -420,8 +519,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Sora_400Regular',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 16,
     paddingHorizontal: 12,
+    includeFontPadding: false,
+    marginBottom: 16,
+  },
+  emptyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyCtaBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
 });

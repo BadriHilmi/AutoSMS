@@ -129,7 +129,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
             {/* Title */}
-            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Campaign Title</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Campaign title</Text>
             <TextInput
               style={[
                 styles.inputField,
@@ -142,7 +142,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
             />
 
             {/* Message Body */}
-            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Message Body</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Message body</Text>
             <TextInput
               style={[
                 styles.msgInput,

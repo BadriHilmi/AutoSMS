@@ -22,6 +22,7 @@ import { useSimCards } from '../../hooks/useSimCards';
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import SmsEngine from '../../../modules/sms-engine';
+import { haptics } from '../../utils/haptics';
 
 export const SettingsScreen: React.FC = () => {
   const { colors, typography, isDark, setThemeMode, themeMode } = useTheme();
@@ -81,6 +82,7 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleExportCsv = async () => {
+    haptics.impactLight();
     try {
       const logs = await getAllLogs();
       const csvHeader = 'Phone Number,Recipient Name,Status,SIM Slot,Sent Time,Delivered Time,Message\n';
@@ -114,6 +116,7 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleBackupRestore = async () => {
+    haptics.impactLight();
     try {
       const schedules = await getAllSchedules();
       const contacts = await getAllContacts();
@@ -171,7 +174,10 @@ export const SettingsScreen: React.FC = () => {
                 { label: 'Dark', value: 'dark' },
               ]}
               selectedValue={themeMode}
-              onSelect={(val) => setThemeMode(val)}
+              onSelect={(val) => {
+                haptics.selection();
+                setThemeMode(val);
+              }}
             />
           </View>
         </View>
@@ -189,7 +195,10 @@ export const SettingsScreen: React.FC = () => {
           </View>
           <Switch
             value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
+            onValueChange={(val) => {
+              haptics.selection();
+              setNotificationsEnabled(val);
+            }}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#ffffff"
           />
@@ -210,7 +219,10 @@ export const SettingsScreen: React.FC = () => {
           </View>
           <Switch
             value={preAlertEnabled}
-            onValueChange={setPreAlertEnabled}
+            onValueChange={(val) => {
+              haptics.selection();
+              setPreAlertEnabled(val);
+            }}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#ffffff"
           />
@@ -229,7 +241,10 @@ export const SettingsScreen: React.FC = () => {
           </View>
           <Switch
             value={appLockEnabled}
-            onValueChange={handleToggleAppLock}
+            onValueChange={(val) => {
+              haptics.selection();
+              handleToggleAppLock(val);
+            }}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#ffffff"
           />
@@ -247,7 +262,7 @@ export const SettingsScreen: React.FC = () => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.settingTitle, { color: colors.text }]}>
-                Allow Unrestricted Battery
+                Allow unrestricted battery
               </Text>
               <Text style={[styles.settingSub, { color: colors.textMuted }]}>
                 Prevent Android Doze from delaying scheduled tasks
@@ -280,7 +295,10 @@ export const SettingsScreen: React.FC = () => {
                 { label: simCards[1]?.displayName || 'SIM 2', value: 'SIM2' },
               ]}
               selectedValue={defaultSim}
-              onSelect={setDefaultSim}
+              onSelect={(val) => {
+                haptics.selection();
+                setDefaultSim(val);
+              }}
               style={{ marginTop: 10 }}
             />
           </View>
@@ -324,7 +342,10 @@ export const SettingsScreen: React.FC = () => {
               { label: '30s', value: 30 },
             ]}
             selectedValue={sendDelay}
-            onSelect={(val) => setSendDelay(Number(val))}
+            onSelect={(val) => {
+              haptics.selection();
+              setSendDelay(Number(val));
+            }}
             style={{ marginTop: 12 }}
           />
 
@@ -332,7 +353,7 @@ export const SettingsScreen: React.FC = () => {
           <View style={[styles.nonBlockingTipBox, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
             <MaterialIcons name="info-outline" size={14} color={colors.primary} />
             <Text style={[styles.nonBlockingTipText, { color: colors.textMuted }]}>
-              Carrier safety tip: 10s or 15s delay is recommended for bulk batches to avoid SIM rate-limits.
+              Pacing note: A 10s–15s delay is recommended for bulk batches to avoid telecom carrier throttling.
             </Text>
           </View>
         </View>
@@ -391,17 +412,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   pageTitleBlock: {
-    paddingVertical: 10,
-    marginBottom: 2,
+    paddingVertical: 12,
+    marginBottom: 4,
   },
   title: {
     fontSize: 20,
+    lineHeight: 26,
     fontFamily: 'Sora_700Bold',
     includeFontPadding: false,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 12.5,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Sora_400Regular',
     includeFontPadding: false,
   },
@@ -409,45 +432,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
   settingRowBlock: {
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
   settingLeft: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingRight: 10,
+    gap: 8,
+    paddingRight: 8,
   },
   iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   settingTitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
   settingSub: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'Sora_400Regular',
-    marginTop: 1,
+    marginTop: 2,
     includeFontPadding: false,
   },
   chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 999,
   },
   chipText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
@@ -455,17 +478,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 10,
+    marginTop: 8,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
   },
   nonBlockingTipText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'Sora_400Regular',
-    lineHeight: 15,
+    lineHeight: 16,
     includeFontPadding: false,
   },
 });

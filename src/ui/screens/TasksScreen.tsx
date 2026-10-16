@@ -21,6 +21,7 @@ import { formatRecurrenceLabel } from '../../domain/scheduler';
 import SmsEngine from '../../../modules/sms-engine';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppSettings } from '../../context/AppSettingsContext';
+import { haptics } from '../../utils/haptics';
 
 export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ onNavigateToCompose }) => {
   const { colors } = useTheme();
@@ -255,6 +256,7 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
   };
 
   const handleTogglePause = async (task: Schedule) => {
+    haptics.impactMedium();
     const nextStatus = task.status === 'RUNNING' ? 'PAUSED' : 'RUNNING';
     try {
       await updateScheduleStatus(task.id, nextStatus);
@@ -269,12 +271,14 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
   };
 
   const handleDelete = async (id: string) => {
+    haptics.impactLight();
     Alert.alert('Delete Task', 'Are you sure you want to delete this scheduled task?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          haptics.notificationError();
           try {
             await deleteSchedule(id);
             await SmsEngine.cancelAlarmTask(id);
@@ -314,17 +318,21 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
         </Text>
       </View>
 
-      {/* Modern Stat Card */}
-      <View style={[styles.statCard, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
-        <View style={styles.statLeft}>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Active campaigns</Text>
-          <Text style={[styles.statNum, { color: colors.primaryDark }]}>{activeCount}</Text>
-          <Text style={[styles.statNote, { color: colors.textMuted }]}>
-            {upcomingCount} scheduled • {completedCount} completed
-          </Text>
+      {/* Compact Stat Bar */}
+      <View style={[styles.statRow, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statNum, { color: colors.primary }]}>{activeCount}</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Active</Text>
         </View>
-        <View style={[styles.statIconBox, { backgroundColor: colors.primaryContainer }]}>
-          <MaterialIcons name="auto-awesome" size={24} color={colors.primary} />
+        <View style={[styles.statDivider, { backgroundColor: colors.borderSubtle }]} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNum, { color: colors.text }]}>{upcomingCount}</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Upcoming</Text>
+        </View>
+        <View style={[styles.statDivider, { backgroundColor: colors.borderSubtle }]} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNum, { color: colors.text }]}>{completedCount}</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Completed</Text>
         </View>
       </View>
 
@@ -373,6 +381,7 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
                 isActive && [styles.activeTabPill, { backgroundColor: colors.surfaceCard }],
               ]}
               onPress={() => {
+                haptics.selection();
                 setHasUserSwitchedTab(true);
                 setActiveTab(tab.key as any);
               }}
@@ -433,6 +442,18 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
               ? 'Start an SMS campaign from the Compose tab or resume an upcoming task.'
               : 'Compose a message and set a date or recurrence to automate your SMS sends.'}
           </Text>
+          {onNavigateToCompose && (
+            <TouchableOpacity
+              style={[styles.emptyCtaBtn, { backgroundColor: colors.primary }]}
+              onPress={onNavigateToCompose}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="add" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text style={styles.emptyCtaBtnText}>
+                {activeTab === 'completed' ? 'New Campaign' : 'Create Campaign'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         filteredTasks.map((task) => {
@@ -468,7 +489,42 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
                 editable={false}
               />
 
-              {task.status === 'RUNNING' && <ProgressBar progress={progress} />}
+              {task.status === 'RUNNING' && (
+                <View style={[styles.runningTelemetryBox, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
+                  <View style={styles.runningTelemetryHeader}>
+                    <View style={styles.runningBeaconRow}>
+                      <View style={[styles.beaconDot, { backgroundColor: colors.success }]} />
+                      <Text style={[styles.runningBeaconText, { color: colors.success }]}>
+                        Dispatching via SIM {(task.simSlot ?? 0) + 1}
+                      </Text>
+                    </View>
+                    <Text style={[styles.runningMetricsText, { color: colors.text }]}>
+                      {task.sentCount} / {task.totalRecipients} sent
+                    </Text>
+                  </View>
+                  <ProgressBar progress={progress} />
+                  <Text style={[styles.runningNextDelay, { color: colors.textMuted }]}>
+                    Pacing: {task.intervalDelaySec || 10}s interval between contacts
+                  </Text>
+                </View>
+              )}
+
+              {task.status === 'PAUSED' && (
+                <View style={[styles.runningTelemetryBox, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
+                  <View style={styles.runningTelemetryHeader}>
+                    <View style={styles.runningBeaconRow}>
+                      <View style={[styles.beaconDot, { backgroundColor: colors.pending }]} />
+                      <Text style={[styles.runningBeaconText, { color: colors.pending }]}>
+                        Campaign paused
+                      </Text>
+                    </View>
+                    <Text style={[styles.runningMetricsText, { color: colors.text }]}>
+                      {task.sentCount} / {task.totalRecipients} sent
+                    </Text>
+                  </View>
+                  <ProgressBar progress={progress} />
+                </View>
+              )}
 
               <View style={styles.statsRow}>
                 <View style={styles.statsItem}>
@@ -527,7 +583,7 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
                     activeOpacity={0.7}
                   >
                     <MaterialIcons name="play-arrow" size={16} color={colors.primaryDark} />
-                    <Text style={[styles.btnActionText, { color: colors.primaryDark }]}>Run Now</Text>
+                    <Text style={[styles.btnActionText, { color: colors.primaryDark }]}>Run now</Text>
                   </TouchableOpacity>
                 )}
 
@@ -538,7 +594,7 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
                     activeOpacity={0.7}
                   >
                     <MaterialIcons name="replay" size={16} color={colors.primaryDark} />
-                    <Text style={[styles.btnActionText, { color: colors.primaryDark }]}>Run Again</Text>
+                    <Text style={[styles.btnActionText, { color: colors.primaryDark }]}>Run again</Text>
                   </TouchableOpacity>
                 )}
 
@@ -595,77 +651,71 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 12.5,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Sora_400Regular',
     includeFontPadding: false,
   },
-  statCard: {
+  statRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     borderRadius: 16,
-    padding: 15,
-    marginBottom: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginBottom: 16,
     borderWidth: 1,
-    shadowColor: '#002521',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
   },
-  statLeft: {
+  statItem: {
     flex: 1,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontFamily: 'Sora_600SemiBold',
-    includeFontPadding: false,
-  },
-  statNum: {
-    fontSize: 22,
-    fontFamily: 'Sora_700Bold',
-    marginTop: 2,
-    includeFontPadding: false,
-  },
-  statNote: {
-    fontSize: 11.5,
-    fontFamily: 'Sora_400Regular',
-    marginTop: 3,
-    includeFontPadding: false,
-  },
-  statIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  statNum: {
+    fontSize: 18,
+    fontFamily: 'Sora_700Bold',
+    fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontFamily: 'Sora_500Medium',
+    includeFontPadding: false,
+  },
+  statDivider: {
+    width: 1,
+    height: 28,
   },
   tabContainer: {
     flexDirection: 'row',
     borderRadius: 999,
     borderWidth: 1,
-    padding: 3,
-    marginBottom: 14,
-    gap: 3,
+    padding: 4,
+    marginBottom: 16,
+    gap: 4,
   },
   tabPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 999,
     gap: 4,
   },
   activeTabPill: {
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
   },
   tabLabel: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
@@ -673,17 +723,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Sora_700Bold',
   },
   countPill: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 999,
   },
   countPillText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'Sora_700Bold',
+    fontVariant: ['tabular-nums'],
     includeFontPadding: false,
   },
   taskCard: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   cardTop: {
     flexDirection: 'row',
@@ -696,19 +747,19 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   scheduleLine: {
-    fontSize: 13.5,
-    fontFamily: 'Sora_700Bold',
+    fontSize: 14,
+    fontFamily: 'Sora_600SemiBold',
     marginBottom: 4,
     includeFontPadding: false,
   },
   freqBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   freqText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
@@ -716,7 +767,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     padding: 10,
-    fontSize: 12.5,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Sora_400Regular',
     minHeight: 48,
     textAlignVertical: 'top',
@@ -732,11 +784,12 @@ const styles = StyleSheet.create({
   statsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   statSub: {
     fontSize: 12,
     fontFamily: 'Sora_500Medium',
+    fontVariant: ['tabular-nums'],
     includeFontPadding: false,
   },
   actionsRow: {
@@ -745,11 +798,11 @@ const styles = StyleSheet.create({
   },
   btnAction: {
     flex: 1,
-    minHeight: 38,
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 6,
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 8,
@@ -759,30 +812,30 @@ const styles = StyleSheet.create({
     flex: 0.35,
   },
   btnActionText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontFamily: 'Sora_600SemiBold',
     includeFontPadding: false,
   },
   emptyContainer: {
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 16,
     paddingVertical: 32,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     alignItems: 'center',
     marginTop: 8,
   },
   emptyIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   emptyTitle: {
-    fontSize: 14.5,
-    fontFamily: 'Sora_700Bold',
-    marginBottom: 5,
+    fontSize: 16,
+    fontFamily: 'Sora_600SemiBold',
+    marginBottom: 4,
     textAlign: 'center',
     includeFontPadding: false,
   },
@@ -790,7 +843,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Sora_400Regular',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 16,
     paddingHorizontal: 12,
     includeFontPadding: false,
   },
@@ -810,9 +863,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   batteryTipBody: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: 'Sora_400Regular',
-    lineHeight: 14.5,
+    lineHeight: 16,
     includeFontPadding: false,
   },
   batteryTipBtn: {
@@ -821,8 +874,66 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   batteryTipBtnText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'Sora_600SemiBold',
+    includeFontPadding: false,
+  },
+  emptyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 14,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyCtaBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontFamily: 'Sora_600SemiBold',
+    includeFontPadding: false,
+  },
+  runningTelemetryBox: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  runningTelemetryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  runningBeaconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  beaconDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  runningBeaconText: {
+    fontSize: 12,
+    fontFamily: 'Sora_600SemiBold',
+    includeFontPadding: false,
+  },
+  runningMetricsText: {
+    fontSize: 12,
+    fontFamily: 'Sora_700Bold',
+    fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
+  },
+  runningNextDelay: {
+    fontSize: 11,
+    fontFamily: 'Sora_400Regular',
+    marginTop: 6,
     includeFontPadding: false,
   },
 });

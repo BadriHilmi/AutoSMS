@@ -2,34 +2,6 @@ import { db } from '../client';
 import { templates, Template } from '../schema';
 import { eq, desc } from 'drizzle-orm';
 
-export const DEFAULT_MAINTENANCE_TEMPLATES = [
-  {
-    id: 'tmpl_maint_scheduled',
-    name: 'Scheduled Maintenance',
-    body: 'Notice: Scheduled maintenance will take place on {Date} at {Time}. System services may experience brief interruptions.',
-  },
-  {
-    id: 'tmpl_maint_urgent',
-    name: 'Urgent Maintenance',
-    body: 'Urgent: Unscheduled maintenance is currently underway to resolve a technical issue. Access may be limited until further notice.',
-  },
-  {
-    id: 'tmpl_maint_completed',
-    name: 'Completed Notice',
-    body: 'Update: Scheduled maintenance on {Date} has concluded successfully. All systems are operational.',
-  },
-  {
-    id: 'tmpl_maint_access',
-    name: 'Premises Access',
-    body: 'Reminder: Maintenance technician will visit on {Date} at {Time}. Please ensure site access for inspection.',
-  },
-  {
-    id: 'tmpl_maint_inspection',
-    name: 'Routine Inspection',
-    body: 'Notice: Routine equipment safety inspection scheduled for {Date} at {Time}. Contact us if you need to reschedule.',
-  },
-];
-
 export async function getAllTemplates(): Promise<Template[]> {
   try {
     return await db.select().from(templates).orderBy(desc(templates.createdAt));
@@ -53,41 +25,41 @@ export async function deleteTemplate(id: string): Promise<void> {
   await db.delete(templates).where(eq(templates.id, id));
 }
 
+const PREMADE_TEMPLATE_NAMES = new Set([
+  'scheduled maintenance',
+  'urgent maintenance',
+  'completed notice',
+  'premises access',
+  'routine inspection',
+]);
+
+/**
+ * Purges any default/premade templates from the SQLite database.
+ * No premade templates are seeded or inserted; only user-created templates are kept.
+ */
 export async function ensureDefaultTemplates(): Promise<Template[]> {
   try {
     const existing = await getAllTemplates();
-    
-    // Purge any legacy promotional templates if they exist in the database
+
     for (const item of existing) {
-      const lower = (item.name + ' ' + item.body).toLowerCase();
-      if (
-        lower.includes('promo') ||
-        lower.includes('flash sale') ||
-        lower.includes('vip30') ||
-        lower.includes('30% off') ||
-        lower.includes('winter gear')
-      ) {
+      const lowerName = item.name.trim().toLowerCase();
+      const lowerBody = item.body.trim().toLowerCase();
+      const isPremadeId = item.id.startsWith('tmpl_maint_') || item.id.startsWith('tmpl_promo_');
+      const isPremadeName = PREMADE_TEMPLATE_NAMES.has(lowerName);
+      const isLegacyPromo =
+        lowerBody.includes('flash sale') ||
+        lowerBody.includes('vip30') ||
+        lowerBody.includes('30% off') ||
+        lowerBody.includes('winter gear');
+
+      if (isPremadeId || isPremadeName || isLegacyPromo) {
         await deleteTemplate(item.id);
       }
     }
 
-    const current = await getAllTemplates();
-    if (current.length === 0) {
-      for (let i = 0; i < DEFAULT_MAINTENANCE_TEMPLATES.length; i++) {
-        const tmpl = DEFAULT_MAINTENANCE_TEMPLATES[i];
-        await db.insert(templates).values({
-          id: tmpl.id,
-          name: tmpl.name,
-          body: tmpl.body,
-          createdAt: Date.now() - (DEFAULT_MAINTENANCE_TEMPLATES.length - i) * 1000,
-        });
-      }
-      return await getAllTemplates();
-    }
-    return current;
+    return await getAllTemplates();
   } catch (err) {
-    console.error('Failed to ensure default templates:', err);
+    console.error('Failed to clean premade templates:', err);
     return [];
   }
 }
-

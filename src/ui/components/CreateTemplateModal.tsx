@@ -92,7 +92,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
               <View>
                 <Text style={[styles.sheetTitle, { color: colors.text }]}>New Custom Template</Text>
                 <Text style={[styles.sheetSubtitle, { color: colors.textMuted }]}>
-                  Save reusable maintenance message notice
+                  Save reusable message template
                 </Text>
               </View>
             </View>
@@ -103,7 +103,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
 
           <ScrollView style={styles.scrollBody} keyboardShouldPersistTaps="handled">
             {/* Template Name */}
-            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>TEMPLATE NAME</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Template name</Text>
             <TextInput
               style={[
                 styles.singleInput,
@@ -133,7 +133,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
 
             {/* Message Body */}
             <View style={styles.messageLabelRow}>
-              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>MESSAGE BODY</Text>
+              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Message body</Text>
               <Text style={[styles.counterText, { color: colors.textMuted }]}>
                 {smsMetrics.charCount} chars • {smsMetrics.segmentCount} SMS
               </Text>
@@ -153,7 +153,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
             />
 
             {/* Token Chips */}
-            <Text style={[styles.microLabel, { color: colors.textMuted }]}>INSERT VARIABLES</Text>
+            <Text style={[styles.microLabel, { color: colors.textMuted }]}>Insert variable tags</Text>
             <View style={styles.tokensRow}>
               {AVAILABLE_TOKENS.map((item) => (
                 <TouchableOpacity
@@ -259,9 +259,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   fieldLabel: {
-    fontSize: 10.5,
+    fontSize: 12.5,
     fontFamily: 'Sora_600SemiBold',
-    letterSpacing: 0.5,
     marginBottom: 6,
     includeFontPadding: false,
   },
@@ -311,9 +310,8 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   microLabel: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: 'Sora_600SemiBold',
-    letterSpacing: 0.5,
     marginTop: 12,
     marginBottom: 6,
     includeFontPadding: false,

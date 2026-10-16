@@ -143,7 +143,7 @@ export const CustomRecurrenceModal: React.FC<CustomRecurrenceModalProps> = ({
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
             {/* Section 1: Repeat Every [Number] [Unit] */}
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>REPEAT EVERY</Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Repeat every</Text>
             <View style={styles.repeatRow}>
               {/* Stepper */}
               <View style={[styles.stepperContainer, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
@@ -206,7 +206,7 @@ export const CustomRecurrenceModal: React.FC<CustomRecurrenceModalProps> = ({
             {/* Section 2: Repeat on days (when unit is WEEKS) */}
             {unit === 'WEEKS' && (
               <View style={styles.daysSection}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>REPEAT ON DAYS</Text>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Repeat on days</Text>
                 <View style={styles.daysRow}>
                   {DAY_NAMES_SHORT.map((name, idx) => {
                     const isSel = selectedDays.includes(idx);
@@ -264,7 +264,7 @@ export const CustomRecurrenceModal: React.FC<CustomRecurrenceModalProps> = ({
             )}
 
             {/* Section 3: Ends */}
-            <Text style={[styles.sectionLabel, { color: colors.textMuted, marginTop: 14 }]}>ENDS</Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted, marginTop: 14 }]}>Ends</Text>
             <View style={styles.endOptionsCol}>
               {/* Option 1: Never */}
               <TouchableOpacity
@@ -361,7 +361,7 @@ export const CustomRecurrenceModal: React.FC<CustomRecurrenceModalProps> = ({
                 <MaterialIcons name="event-repeat" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.summaryTitle, { color: colors.textMuted }]}>SCHEDULE SUMMARY</Text>
+                <Text style={[styles.summaryTitle, { color: colors.textMuted }]}>Schedule summary</Text>
                 <Text style={[styles.summaryDetail, { color: colors.text }]}>
                   {summaryText}
                 </Text>
@@ -452,10 +452,8 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: 'Sora_700Bold',
-    letterSpacing: 0.6,
+    fontSize: 12.5,
+    fontFamily: 'Sora_600SemiBold',
     marginBottom: 8,
   },
   repeatRow: {
@@ -626,9 +624,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   summaryTitle: {
-    fontSize: 10,
-    fontFamily: 'Sora_700Bold',
-    letterSpacing: 0.5,
+    fontSize: 11.5,
+    fontFamily: 'Sora_600SemiBold',
     marginBottom: 2,
   },
   summaryDetail: {

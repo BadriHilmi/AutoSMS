@@ -67,7 +67,7 @@ export const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({
               <View>
                 <Text style={[styles.sheetTitle, { color: colors.text }]}>Manage Templates</Text>
                 <Text style={[styles.sheetSubtitle, { color: colors.textMuted }]}>
-                  Preview, use, or remove maintenance notices
+                  Preview, use, or remove saved templates
                 </Text>
               </View>
             </View>
@@ -101,7 +101,7 @@ export const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({
                 <MaterialIcons name="dashboard-customize" size={36} color={colors.textMuted} />
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>No templates saved</Text>
                 <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-                  Create your first custom maintenance message template for fast reuse.
+                  Create your first custom message template for fast reuse.
                 </Text>
                 <TouchableOpacity
                   style={[styles.emptyCta, { backgroundColor: colors.primary }]}

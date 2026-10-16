@@ -33,8 +33,8 @@ function MainApp() {
       <Header onSettingsPress={() => setActiveTab('settings')} />
       <View style={styles.screenContainer}>
         {activeTab === 'compose' && <ComposeScreen onNavigateToTasks={() => setActiveTab('tasks')} />}
-        {activeTab === 'tasks' && <TasksScreen />}
-        {activeTab === 'history' && <HistoryScreen />}
+        {activeTab === 'tasks' && <TasksScreen onNavigateToCompose={() => setActiveTab('compose')} />}
+        {activeTab === 'history' && <HistoryScreen onNavigateToCompose={() => setActiveTab('compose')} />}
         {activeTab === 'settings' && <SettingsScreen />}
       </View>
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />

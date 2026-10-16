@@ -89,6 +89,8 @@ const NavTabItem: React.FC<NavTabItemProps> = ({
   );
 };
 
+import { haptics } from '../../utils/haptics';
+
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
   const { colors } = useTheme();
 
@@ -116,7 +118,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) 
           label={tab.label}
           icon={tab.icon}
           isActive={activeTab === tab.key}
-          onPress={() => onTabChange(tab.key)}
+          onPress={() => {
+            haptics.selection();
+            onTabChange(tab.key);
+          }}
           colors={colors}
         />
       ))}
@@ -128,10 +133,9 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 6,
+    paddingTop: 8,
     paddingBottom: 16,
     borderTopWidth: 1,
-    shadowColor: '#002521',
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.03,
     shadowRadius: 8,
@@ -143,7 +147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
-    gap: 3,
+    gap: 4,
   },
   iconContainer: {
     width: 52,
@@ -157,12 +161,12 @@ const styles = StyleSheet.create({
     borderRadius: 15,
   },
   navLabel: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'Sora_500Medium',
     textAlign: 'center',
     includeFontPadding: false,
   },
   activeNavLabel: {
-    fontFamily: 'Sora_700Bold',
+    fontFamily: 'Sora_600SemiBold',
   },
 });

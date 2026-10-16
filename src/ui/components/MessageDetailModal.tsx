@@ -258,10 +258,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Sora_500Medium',
   },
   sectionHeading: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: 'Sora_600SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     marginBottom: 6,
     marginTop: 4,
   },
