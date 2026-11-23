@@ -57,9 +57,6 @@ export const MessageDetailModal: React.FC<MessageDetailModalProps> = ({
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-              <MaterialIcons name="close" size={20} color={colors.textMuted} />
-            </TouchableOpacity>
           </View>
 
           {/* Body */}
@@ -218,9 +215,6 @@ const styles = StyleSheet.create({
   phoneSub: {
     fontSize: 12,
     fontFamily: 'Sora_400Regular',
-  },
-  closeBtn: {
-    padding: 4,
   },
   body: {
     padding: 18,

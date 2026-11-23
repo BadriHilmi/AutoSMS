@@ -8,9 +8,9 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { useAlert } from '../../context/AlertContext';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface AddRecipientModalProps {
@@ -25,13 +25,14 @@ export const AddRecipientModal: React.FC<AddRecipientModalProps> = ({
   onAdd,
 }) => {
   const { colors } = useTheme();
+  const { showAlert } = useAlert();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
   const handleAdd = () => {
     const cleanPhone = phone.trim();
     if (!cleanPhone || cleanPhone.length < 3) {
-      Alert.alert('Invalid Number', 'Please enter a valid phone number.');
+      showAlert('Invalid Number', 'Please enter a valid phone number.', undefined, 'warning');
       return;
     }
 

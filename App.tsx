@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/sora';
 import { ThemeProvider, useTheme } from './src/theme';
 import { AppSettingsProvider } from './src/context/AppSettingsContext';
+import { AlertProvider } from './src/context/AlertContext';
 import { initDatabase } from './src/db/client';
 import { Header } from './src/ui/components/Header';
 import { BottomNav, TabKey } from './src/ui/components/BottomNav';
@@ -83,7 +84,9 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AppSettingsProvider>
-          <MainApp />
+          <AlertProvider>
+            <MainApp />
+          </AlertProvider>
         </AppSettingsProvider>
       </ThemeProvider>
     </SafeAreaProvider>

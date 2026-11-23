@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { useAlert } from '../../context/AlertContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Template } from '../../db/schema';
 
@@ -30,25 +30,22 @@ export const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({
   onCreateNew,
 }) => {
   const { colors } = useTheme();
+  const { showConfirm, showAlert, showToast } = useAlert();
 
   const handleDelete = (item: Template) => {
-    Alert.alert(
+    showConfirm(
       'Delete Template',
       `Are you sure you want to delete "${item.name}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await onDeleteTemplate(item.id);
-            } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Failed to delete template.');
-            }
-          },
-        },
-      ]
+      async () => {
+        try {
+          await onDeleteTemplate(item.id);
+          showToast('Template deleted', 'info');
+        } catch (err: any) {
+          showAlert('Error', err?.message || 'Failed to delete template.', undefined, 'danger');
+        }
+      },
+      'Delete',
+      true
     );
   };
 

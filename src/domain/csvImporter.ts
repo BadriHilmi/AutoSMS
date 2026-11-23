@@ -45,3 +45,36 @@ export function parseContactsCsv(csvContent: string): ParsedCsvContact[] {
 
   return results;
 }
+
+/**
+ * Parses raw text containing one or multiple phone numbers separated by
+ * commas, newlines, semicolons, tabs, or spaces.
+ */
+export function parseRawPhoneNumbers(input: string): string[] {
+  if (!input || !input.trim()) return [];
+
+  const chunks = input.split(/[,;\n\r\t|]+/).map(c => c.trim()).filter(Boolean);
+  const results: string[] = [];
+  const seen = new Set<string>();
+
+  for (const chunk of chunks) {
+    const spaceParts = chunk.split(/\s+/).filter(Boolean);
+    if (spaceParts.length > 1 && spaceParts.every(sp => sp.replace(/\D/g, '').length >= 7)) {
+      for (const sp of spaceParts) {
+        const cleaned = cleanPhoneNumber(sp);
+        if (cleaned.length >= 5 && !seen.has(cleaned)) {
+          seen.add(cleaned);
+          results.push(cleaned);
+        }
+      }
+    } else {
+      const cleaned = cleanPhoneNumber(chunk);
+      if (cleaned.length >= 5 && !seen.has(cleaned)) {
+        seen.add(cleaned);
+        results.push(cleaned);
+      }
+    }
+  }
+
+  return results;
+}

@@ -30,7 +30,6 @@ export const Card: React.FC<CardProps> = ({
           backgroundColor: colors.surfaceCard,
           borderColor: colors.border,
           borderRadius: colors.cardRadius,
-          shadowColor: colors.primaryDark,
         },
         style,
       ]}
@@ -62,10 +61,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 16,
     marginBottom: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',

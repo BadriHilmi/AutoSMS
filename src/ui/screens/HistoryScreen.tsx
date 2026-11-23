@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Platform,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { useAlert } from '../../context/AlertContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { getAllLogs, updateLogStatus } from '../../db/queries/logs';
 import { MessageLog } from '../../db/schema';
@@ -23,6 +23,7 @@ interface HistoryScreenProps {
 
 export const HistoryScreen: React.FC<HistoryScreenProps> = ({ onNavigateToCompose }) => {
   const { colors } = useTheme();
+  const { showToast } = useAlert();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SENT' | 'FAILED'>('ALL');
@@ -51,7 +52,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ onNavigateToCompos
       setLogsList((prev) =>
         prev.map((l) => (l.id === log.id ? { ...l, status: 'SENT', errorReason: null } : l))
       );
-      Alert.alert('Retrying', `Resending SMS to ${log.phoneNumber}...`);
+      showToast(`Resending SMS to ${log.phoneNumber}...`, 'info');
     } catch (e) {
       console.log('Retry error:', e);
     }
@@ -337,10 +338,6 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'android' ? 6 : 10,
     gap: 8,
     marginBottom: 12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1,
   },
   searchInput: {
     flex: 1,
@@ -397,10 +394,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
   },
   logRow: {
     flexDirection: 'row',

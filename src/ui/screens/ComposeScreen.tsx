@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Platform,
   PermissionsAndroid,
   Linking,
 } from 'react-native';
+import { useAlert } from '../../context/AlertContext';
 import { useTheme } from '../../theme';
 import { Card } from '../components/Card';
 import { SegmentedControl } from '../components/SegmentedControl';
@@ -20,7 +20,7 @@ import { AVAILABLE_TOKENS } from '../../domain/tokenizer';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Contacts from 'expo-contacts';
-import { parseContactsCsv } from '../../domain/csvImporter';
+import { parseContactsCsv, parseRawPhoneNumbers } from '../../domain/csvImporter';
 import { createSchedule } from '../../db/queries/schedules';
 import {
   FrequencyType,
@@ -73,6 +73,7 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [isAddRecipientOpen, setIsAddRecipientOpen] = useState(false);
   const [isContactPickerOpen, setIsContactPickerOpen] = useState(false);
+  const [quickNumberInput, setQuickNumberInput] = useState('');
   const [recipientSearchQuery, setRecipientSearchQuery] = useState('');
   const [showAllRecipients, setShowAllRecipients] = useState(false);
   const [recurrence, setRecurrence] = useState<FrequencyType>('DAILY');
@@ -80,6 +81,7 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
   const [isCustomRecurrenceOpen, setIsCustomRecurrenceOpen] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const { sendDelay, setSendDelay, notificationsEnabled, preAlertEnabled } = useAppSettings();
+  const { showAlert, showConfirm, showToast } = useAlert();
 
   const smsMetrics = calculateSmsSegments(message);
 
@@ -132,17 +134,18 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
     const updated = await getAllTemplates();
     setTemplatesList(updated);
     setMessage(body);
-    Alert.alert('Template Saved', `"${name}" is ready for use.`);
+    showToast(`"${name}" template saved`, 'success');
   };
 
   const handleDeleteTemplate = async (id: string) => {
     await deleteTemplate(id);
     const updated = await getAllTemplates();
     setTemplatesList(updated);
+    showToast('Template deleted', 'info');
   };
 
   const handleTemplateLongPress = (tmpl: Template) => {
-    Alert.alert(
+    showAlert(
       tmpl.name,
       'Choose an action for this template:',
       [
@@ -151,17 +154,12 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
           text: 'Delete Template',
           style: 'destructive',
           onPress: () => {
-            Alert.alert(
+            showConfirm(
               'Delete Template',
               `Are you sure you want to delete "${tmpl.name}"?`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  style: 'destructive',
-                  onPress: () => handleDeleteTemplate(tmpl.id),
-                },
-              ]
+              () => handleDeleteTemplate(tmpl.id),
+              'Delete',
+              true
             );
           },
         },
@@ -184,6 +182,41 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
     setMessage((prev) => `${prev} ${token}`);
   };
 
+  const handleQuickAddNumbers = () => {
+    const raw = quickNumberInput.trim();
+    if (!raw) return;
+
+    const parsed = parseRawPhoneNumbers(raw);
+    if (parsed.length === 0) {
+      showAlert('Invalid Number', 'Please enter a valid phone number (at least 5 digits).', undefined, 'warning');
+      return;
+    }
+
+    haptics.impactLight();
+    setRecipients((prev) => {
+      const existingPhones = new Set(prev.map((r) => r.phone.replace(/[\s\-\(\)]/g, '')));
+      const newItems = parsed
+        .filter((num) => !existingPhones.has(num.replace(/[\s\-\(\)]/g, '')))
+        .map((num) => ({ name: 'Manual Contact', phone: num }));
+
+      const skippedCount = parsed.length - newItems.length;
+      if (newItems.length === 0) {
+        showToast('Number(s) already in recipient list', 'info');
+      } else if (skippedCount > 0) {
+        showToast(
+          `Added ${newItems.length} number${newItems.length === 1 ? '' : 's'} (${skippedCount} duplicate${skippedCount === 1 ? '' : 's'} skipped)`,
+          'info'
+        );
+      } else {
+        showToast(`Added ${newItems.length} recipient${newItems.length === 1 ? '' : 's'}`, 'success');
+      }
+
+      return [...prev, ...newItems];
+    });
+
+    setQuickNumberInput('');
+  };
+
   const handlePickContacts = () => {
     setIsContactPickerOpen(true);
   };
@@ -195,12 +228,12 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
         (c) => !existingPhones.has(c.phone.replace(/[\s\-\(\)]/g, ''))
       );
       if (newUnique.length < chosen.length) {
-        Alert.alert(
-          'Contacts Added',
-          `Added ${newUnique.length} new ${newUnique.length === 1 ? 'contact' : 'contacts'} (${chosen.length - newUnique.length} already in list).`
+        showToast(
+          `Added ${newUnique.length} contacts (${chosen.length - newUnique.length} duplicates skipped)`,
+          'info'
         );
       } else {
-        Alert.alert('Success', `Added ${newUnique.length} ${newUnique.length === 1 ? 'contact' : 'contacts'} to campaign.`);
+        showToast(`Added ${newUnique.length} ${newUnique.length === 1 ? 'contact' : 'contacts'} to campaign`, 'success');
       }
       return [...prev, ...newUnique];
     });
@@ -219,11 +252,11 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
             ...prev,
             ...parsed.map((p) => ({ name: p.name, phone: p.phoneNumber })),
           ]);
-          Alert.alert('Success', `Imported ${parsed.length} contacts from CSV.`);
+          showToast(`Imported ${parsed.length} contacts from CSV`, 'success');
         }
       }
     } catch (e) {
-      Alert.alert('Error', 'Could not read CSV file.');
+      showAlert('Error', 'Could not read CSV file.', undefined, 'danger');
     }
   };
 
@@ -233,11 +266,11 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
 
   const handleScheduleCampaign = async () => {
     if (!message.trim()) {
-      Alert.alert('Error', 'Please enter a message.');
+      showAlert('Missing Message', 'Please enter a message to schedule.', undefined, 'warning');
       return;
     }
     if (recipients.length === 0) {
-      Alert.alert('Error', 'Please add at least one recipient.');
+      showAlert('Missing Recipients', 'Please add at least one recipient to the campaign.', undefined, 'warning');
       return;
     }
 
@@ -255,7 +288,7 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
         const smsGranted = results[PermissionsAndroid.PERMISSIONS.SEND_SMS] === PermissionsAndroid.RESULTS.GRANTED;
 
         if (!smsGranted) {
-          Alert.alert(
+          showAlert(
             'SMS Permission Required',
             'AutoSMS requires SMS permission to send campaigns. Please enable SMS access in device settings.',
             [
@@ -264,7 +297,8 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
                 text: 'Open Settings',
                 onPress: () => Linking.openSettings(),
               },
-            ]
+            ],
+            'warning'
           );
           return;
         }
@@ -286,7 +320,7 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
     });
 
     if (runTimestamp === null) {
-      Alert.alert('Invalid Schedule', 'The selected custom recurrence has already reached its end condition or has no upcoming run.');
+      showAlert('Invalid Schedule', 'The selected custom recurrence has already reached its end condition or has no upcoming run.', undefined, 'warning');
       return;
     }
 
@@ -583,14 +617,40 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
           </View>
         }
       >
+        {/* Direct Quick Add Input Bar */}
+        <View style={[styles.quickAddBox, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
+          <MaterialIcons name="dialpad" size={17} color={colors.textMuted} />
+          <TextInput
+            style={[styles.quickAddInput, { color: colors.text }]}
+            placeholder="Type or paste number(s), e.g. 018..."
+            placeholderTextColor={colors.textMuted}
+            value={quickNumberInput}
+            onChangeText={setQuickNumberInput}
+            onSubmitEditing={handleQuickAddNumbers}
+            returnKeyType="done"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {quickNumberInput.trim().length > 0 && (
+            <TouchableOpacity
+              style={[styles.quickAddBtn, { backgroundColor: colors.primary }]}
+              onPress={handleQuickAddNumbers}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="add" size={15} color="#ffffff" />
+              <Text style={styles.quickAddBtnText}>Add</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={styles.btnRow}>
           <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: colors.primaryContainer, borderColor: colors.primaryLight }]}
+            style={[styles.actionBtn, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}
             onPress={() => setIsAddRecipientOpen(true)}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="person-add" size={15} color={colors.primaryDark} />
-            <Text style={[styles.actionBtnText, { color: colors.primaryDark }]}>Add single</Text>
+            <MaterialIcons name="person-add" size={15} color={colors.text} />
+            <Text style={[styles.actionBtnText, { color: colors.text }]}>Add with name</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -613,21 +673,23 @@ export const ComposeScreen: React.FC<{ onNavigateToTasks?: () => void }> = ({ on
         </View>
 
         {/* Recipient Search Filter */}
-        <View style={[styles.recipientSearchBox, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
-          <MaterialIcons name="search" size={16} color={colors.textMuted} />
-          <TextInput
-            style={[styles.recipientSearchInput, { color: colors.text }]}
-            placeholder="Filter recipients by name or phone..."
-            placeholderTextColor={colors.textMuted}
-            value={recipientSearchQuery}
-            onChangeText={setRecipientSearchQuery}
-          />
-          {recipientSearchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setRecipientSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialIcons name="close" size={15} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
+        {recipients.length > 3 && (
+          <View style={[styles.recipientSearchBox, { backgroundColor: colors.surfaceSunken, borderColor: colors.border }]}>
+            <MaterialIcons name="search" size={16} color={colors.textMuted} />
+            <TextInput
+              style={[styles.recipientSearchInput, { color: colors.text }]}
+              placeholder="Filter recipients by name or phone..."
+              placeholderTextColor={colors.textMuted}
+              value={recipientSearchQuery}
+              onChangeText={setRecipientSearchQuery}
+            />
+            {recipientSearchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setRecipientSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <MaterialIcons name="close" size={15} color={colors.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Recipients List Rendering */}
         {filteredRecipients.length === 0 ? (
@@ -1224,6 +1286,37 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 8,
+  },
+  quickAddBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'android' ? 4 : 8,
+    gap: 8,
+    marginBottom: 10,
+  },
+  quickAddInput: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'Sora_400Regular',
+    paddingVertical: 0,
+    includeFontPadding: false,
+  },
+  quickAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 2,
+  },
+  quickAddBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontFamily: 'Sora_700Bold',
+    includeFontPadding: false,
   },
   recipientSearchBox: {
     flexDirection: 'row',

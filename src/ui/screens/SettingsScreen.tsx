@@ -6,9 +6,9 @@ import {
   Switch,
   ScrollView,
   StyleSheet,
-  Alert,
   Linking,
 } from 'react-native';
+import { useAlert } from '../../context/AlertContext';
 import { useTheme } from '../../theme';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { Card } from '../components/Card';
@@ -26,6 +26,7 @@ import { haptics } from '../../utils/haptics';
 
 export const SettingsScreen: React.FC = () => {
   const { colors, typography, isDark, setThemeMode, themeMode } = useTheme();
+  const { showAlert, showToast } = useAlert();
   const { isDualSim, simCards, singleSimLabel } = useSimCards();
   const {
     notificationsEnabled,
@@ -53,7 +54,7 @@ export const SettingsScreen: React.FC = () => {
         if (auth.success) {
           setAppLockEnabled(true);
         } else {
-          Alert.alert('Authentication Failed', 'Could not verify identity.');
+          showAlert('Authentication Failed', 'Could not verify identity.', undefined, 'danger');
         }
       } else {
         setAppLockEnabled(true);
@@ -67,7 +68,7 @@ export const SettingsScreen: React.FC = () => {
     try {
       const launched = await SmsEngine.requestIgnoreBatteryOptimizations();
       if (!launched) {
-        Alert.alert(
+        showAlert(
           'Background Battery',
           'AutoSMS is already unrestricted, or you can verify battery permissions in Android system settings.',
           [
@@ -108,10 +109,10 @@ export const SettingsScreen: React.FC = () => {
           dialogTitle: 'Export SMS History CSV',
         });
       } else {
-        Alert.alert('Exported', `Saved to ${fileUri}`);
+        showToast('CSV Exported successfully', 'success');
       }
     } catch (e) {
-      Alert.alert('Export Error', 'Could not generate CSV file.');
+      showAlert('Export Error', 'Could not generate CSV file.', undefined, 'danger');
     }
   };
 
@@ -140,10 +141,10 @@ export const SettingsScreen: React.FC = () => {
           dialogTitle: 'Backup AutoSMS Data',
         });
       } else {
-        Alert.alert('Backup Created', `Saved to ${fileUri}`);
+        showToast('Backup created successfully', 'success');
       }
     } catch (e) {
-      Alert.alert('Backup Error', 'Could not export backup data.');
+      showAlert('Backup Error', 'Could not export backup data.', undefined, 'danger');
     }
   };
 

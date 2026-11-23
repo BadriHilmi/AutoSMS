@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Linking,
 } from 'react-native';
 import { useTheme } from '../../theme';
@@ -21,11 +20,13 @@ import { formatRecurrenceLabel } from '../../domain/scheduler';
 import SmsEngine from '../../../modules/sms-engine';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppSettings } from '../../context/AppSettingsContext';
+import { useAlert } from '../../context/AlertContext';
 import { haptics } from '../../utils/haptics';
 
 export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ onNavigateToCompose }) => {
   const { colors } = useTheme();
   const { notificationsEnabled, preAlertEnabled } = useAppSettings();
+  const { showAlert, showConfirm, showToast } = useAlert();
 
   const [activeTab, setActiveTab] = useState<'active' | 'upcoming' | 'completed'>('active');
   const [schedulesList, setSchedulesList] = useState<Schedule[]>([]);
@@ -36,7 +37,7 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
     try {
       const launched = await SmsEngine.requestIgnoreBatteryOptimizations();
       if (!launched) {
-        Alert.alert(
+        showAlert(
           'Background Battery',
           'AutoSMS is already unrestricted, or you can manage power permissions in Android system settings.',
           [
@@ -174,38 +175,34 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
   };
 
   const handleRunNow = async (task: Schedule) => {
-    Alert.alert(
+    showConfirm(
       'Run Campaign Now',
       `Start sending "${task.title || 'SMS Campaign'}" immediately?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Run Now',
-          onPress: async () => {
-            try {
-              await SmsEngine.runCampaignNow({
-                taskId: task.id,
-                title: task.title || 'SMS Campaign',
-                message: task.messageBody,
-                recipientsJson: task.targetNumbers || '[]',
-                intervalDelaySec: task.intervalDelaySec ?? 10,
-                simSlot: task.simSlot ?? 0,
-                frequency: task.frequency,
-                customRule: task.customRule ?? undefined,
-                notificationsEnabled,
-                preAlertEnabled,
-              });
-              await updateScheduleStatus(task.id, 'RUNNING');
-              setSchedulesList((prev) =>
-                prev.map((s) => (s.id === task.id ? { ...s, status: 'RUNNING' } : s))
-              );
-              setActiveTab('active');
-            } catch (err: any) {
-              Alert.alert('Run Failed', err.message || 'Could not start campaign.');
-            }
-          },
-        },
-      ]
+      async () => {
+        try {
+          await SmsEngine.runCampaignNow({
+            taskId: task.id,
+            title: task.title || 'SMS Campaign',
+            message: task.messageBody,
+            recipientsJson: task.targetNumbers || '[]',
+            intervalDelaySec: task.intervalDelaySec ?? 10,
+            simSlot: task.simSlot ?? 0,
+            frequency: task.frequency,
+            customRule: task.customRule ?? undefined,
+            notificationsEnabled,
+            preAlertEnabled,
+          });
+          await updateScheduleStatus(task.id, 'RUNNING');
+          setSchedulesList((prev) =>
+            prev.map((s) => (s.id === task.id ? { ...s, status: 'RUNNING' } : s))
+          );
+          setActiveTab('active');
+          showToast('Campaign started', 'success');
+        } catch (err: any) {
+          showAlert('Run Failed', err.message || 'Could not start campaign.');
+        }
+      },
+      'Run Now'
     );
   };
 
@@ -248,10 +245,10 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
       );
       setIsEditModalVisible(false);
       setEditingTask(null);
-      Alert.alert('Campaign Updated', 'Your changes have been saved successfully.');
+      showToast('Campaign updated successfully', 'success');
     } catch (e: any) {
       console.log('Failed to update schedule:', e);
-      Alert.alert('Update Failed', e.message || 'Could not update campaign.');
+      showAlert('Update Failed', e.message || 'Could not update campaign.');
     }
   };
 
@@ -272,21 +269,21 @@ export const TasksScreen: React.FC<{ onNavigateToCompose?: () => void }> = ({ on
 
   const handleDelete = async (id: string) => {
     haptics.impactLight();
-    Alert.alert('Delete Task', 'Are you sure you want to delete this scheduled task?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          haptics.notificationError();
-          try {
-            await deleteSchedule(id);
-            await SmsEngine.cancelAlarmTask(id);
-          } catch (e) {}
-          setSchedulesList((prev) => prev.filter((s) => s.id !== id));
-        },
+    showConfirm(
+      'Delete Task',
+      'Are you sure you want to delete this scheduled task?',
+      async () => {
+        haptics.notificationError();
+        try {
+          await deleteSchedule(id);
+          await SmsEngine.cancelAlarmTask(id);
+        } catch (e) {}
+        setSchedulesList((prev) => prev.filter((s) => s.id !== id));
+        showToast('Task deleted', 'info');
       },
-    ]);
+      'Delete',
+      true
+    );
   };
 
   const filteredTasks = schedulesList.filter((s) => {
@@ -665,10 +662,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginBottom: 16,
     borderWidth: 1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
   },
   statItem: {
     flex: 1,
@@ -709,10 +702,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   activeTabPill: {
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
   },
   tabLabel: {
     fontSize: 12,

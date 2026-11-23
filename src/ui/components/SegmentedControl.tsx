@@ -80,11 +80,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   activeButton: {
-    shadowColor: '#002521',
-    shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 2,
   },
   segmentText: {
     fontSize: 12.5,

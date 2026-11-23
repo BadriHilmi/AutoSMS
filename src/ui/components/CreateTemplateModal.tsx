@@ -8,10 +8,10 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { useTheme } from '../../theme';
+import { useAlert } from '../../context/AlertContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AVAILABLE_TOKENS } from '../../domain/tokenizer';
 import { calculateSmsSegments } from '../../domain/smsCounter';
@@ -30,6 +30,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
   initialDraft = '',
 }) => {
   const { colors } = useTheme();
+  const { showAlert } = useAlert();
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,12 +51,12 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
     const trimmedBody = body.trim();
 
     if (!trimmedName) {
-      Alert.alert('Missing Name', 'Please enter a name for this template.');
+      showAlert('Missing Name', 'Please enter a name for this template.', undefined, 'warning');
       return;
     }
 
     if (!trimmedBody) {
-      Alert.alert('Missing Message', 'Please enter the message body for this template.');
+      showAlert('Missing Message', 'Please enter the message body for this template.', undefined, 'warning');
       return;
     }
 
@@ -66,7 +67,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
       setBody('');
       onClose();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not save template.');
+      showAlert('Error', e?.message || 'Could not save template.', undefined, 'danger');
     } finally {
       setIsSubmitting(false);
     }
